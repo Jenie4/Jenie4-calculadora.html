@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calculadora</title>
+</head>
+<body> 
+</body>
+</html>
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Calculadora</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial}
+    body{display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f3f4f6}
+    .calc{width:320px;background:white;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:18px}
+    .display{height:56px;background:#f4fc7f;color:#e6eef8;border-radius:8px;padding:8px 12px;font-size:20px;display:flex;flex-direction:column;justify-content:center;word-break:break-all}
+    .sub{font-size:12px;color:#003ba8}
+    .row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+    button{height:54px;border-radius:8px;border:0;font-size:18px;cursor:pointer}
+    .btn-op{background:#cfbaff;color:white}
+    .btn-num{background:#eef2ff}
+    .btn-ac{background:#cd0077;color:white}
+    .btn-eq{background:#b0fbfb;color:white;grid-column:span 2}
+    .btn-wide{grid-column:span 2}
+    button:active{transform:translateY(1px)}
+  </style>
+</head>
+<body>
+  <div class="calc" role="application" aria-label="Calculadora">
+    <div class="display" id="display">
+      <div id="expr" class="sub">0</div>
+    </div>
+
+    <div class="row">
+      <button class="btn-ac" data-action="clear">C</button>
+      <button data-action="back">←</button>
+      <button data-value="%">%</button>
+      <button class="btn-op" data-value="/">÷</button>
+
+      <button class="btn-num" data-value="7">7</button>
+      <button class="btn-num" data-value="8">8</button>
+      <button class="btn-num" data-value="9">9</button>
+      <button class="btn-op" data-value="*">×</button>
+
+      <button class="btn-num" data-value="4">4</button>
+      <button class="btn-num" data-value="5">5</button>
+      <button class="btn-num" data-value="6">6</button>
+      <button class="btn-op" data-value="-">−</button>
+
+      <button class="btn-num" data-value="1">1</button>
+      <button class="btn-num" data-value="2">2</button>
+      <button class="btn-num" data-value="3">3</button>
+      <button class="btn-op" data-value="+">+</button>
+
+      <button class="btn-num btn-wide" data-value="0">0</button>
+      <button class="btn-num" data-value=".">.</button>
+      <button class="btn-eq" data-action="equals">=</button>
+    </div>
+  </div>
+
+  <script>
+    const exprEl = document.getElementById('expr');
+    const buttons = document.querySelectorAll('button');
+
+    let expr = ''; // expresión visible (con símbolos)
+    const operators = ['+','-','*','/'];
+
+    function render() {
+      exprEl.textContent = expr || '0';
+    }
+
+    function safeAppend(val) {
+      // evitar entradas inválidas: doble operador, varios puntos en un número
+      const last = expr.slice(-1);
+      if (operators.includes(val)) {
+        if (expr === '' && val !== '-') return; // no empezar con operador salvo -
+        if (operators.includes(last)) {
+          // reemplaza el operador final por el nuevo (permite cambiar + a - etc)
+          expr = expr.slice(0, -1) + val;
+          return;
+        }
+      }
+
+      if (val === '.') {
+        // no permitir más de un punto en el número actual
+        // buscar el fragmento desde el último operador
+        const afterLastOp = expr.split(/[\+\-\*\/]/).pop();
+        if (afterLastOp.includes('.')) return;
+        if (afterLastOp === '') {
+          // si empezó número con punto, anteponer 0
+          expr += '0';
+        }
+      }
+
+      expr += val;
+    }
+
+    function evaluateExpression(s) {
+      if (!s) return '';
+      // convertir porcentajes: "50%" -> "(50/100)"
+      s = s.replace(/(\d+(\.\d+)?)%/g, '($1/100)');
+      // seguridad básica: permitir solo números, paréntesis, operadores y puntos
+      if (!/^[0-9+\-*/().\s]+$/.test(s)) throw new Error('Caracter inválido');
+      // evaluación segura-ish usando Function
+      // atrapamos errores aritméticos (division por 0 produce Infinity)
+      const result = Function('"use strict";return (' + s + ')')();
+      if (!isFinite(result)) throw new Error('Resultado inválido');
+      return String(result);
+    }
+
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const v = btn.getAttribute('data-value');
+        const action = btn.getAttribute('data-action');
+
+        if (action === 'clear') { expr = ''; render(); return; }
+        if (action === 'back') {
+          expr = expr.slice(0, -1);
+          render();
+          return;
+        }
+        if (action === 'equals') {
+          try {
+            const res = evaluateExpression(expr.replace(/×/g,'*').replace(/÷/g,'/'));
+            expr = res;
+          } catch (e) {
+            expr = 'Error';
+            setTimeout(()=> expr = '', 900);
+          }
+          render();
+          return;
+        }
+
+        if (v) {
+          // mapear símbolos visuales a operadores reales 
+          const value = (v === '×') ? '*' : (v === '÷' ? '/' : v);
+          safeAppend(value);
+          render();
+        }
+      });
+    });
+
+    // soporte teclado
+    window.addEventListener('keydown', (ev) => {
+      const k = ev.key;
+      if ((/^[0-9]$/).test(k)) { safeAppend(k); render(); return; }
+      if (k === '.') { safeAppend('.'); render(); return; }
+      if (k === 'Enter') { ev.preventDefault(); document.querySelector('[data-action="equals"]').click(); return; }
+      if (k === 'Backspace') { document.querySelector('[data-action="back"]').click(); return; }
+      if (k === 'Escape') { document.querySelector('[data-action="clear"]').click(); return; }
+      if (k === '+' || k === '-' || k === '*' || k === '/') { safeAppend(k); render(); return; }
+      if (k === '%') { safeAppend('%'); render(); return; }
+    });
+
+    render();
+  </script>
+</body>
+</html>
